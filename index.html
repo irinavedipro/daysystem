@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Трекер Состояния</title>
+  
+  <!-- Подключение Tailwind CSS для стилей -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Подключение React и ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Подключение Babel для компиляции JSX в браузере -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Функция для безопасного рендеринга текста
+    const renderSafe = (val) => {
+      if (val == null) return '';
+      if (typeof val === 'string' || typeof val === 'number') return val;
+      if (Array.isArray(val)) return val.map(v => typeof v === 'object' ? JSON.stringify(v) : v).join(', ');
+      if (typeof val === 'object') return val.text || val.title || JSON.stringify(val);
+      return String(val);
+    };
+
+    // --- Утилиты для работы с датами ---
+    const getFormattedDateInfo = (dateString) => {
+      const date = new Date(dateString);
+      const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+      const days = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+      return {
+        date: `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`,
+        day: days[date.getDay()]
+      };
+    };
+
+    const shiftDate = (dateString, daysOffset) => {
+      const date = new Date(dateString);
+      date.setDate(date.getDate() + daysOffset);
+      return date.toISOString().split('T')[0];
+    };
+
+    // --- Базовые шаблоны и предзагруженные дни ---
+    const emptyDayTemplate = {
+      header: { title: 'ПЛАН ДНЯ', date: '', day: '' },
+      aiQuote: { icon: '✨', text: 'Новый день — чистый лист для выстраивания системы.' },
+      aiResponse: null,
+      blocks: [
+        {
+          id: 'focus',
+          title: 'ДЕНЬ — Фокус',
+          color: 'bg-[#CC823F]',
+          icon: '🎯',
+          tasks: []
+        }
+      ],
+      footerAlerts: [],
+      globalMotto: 'ДЕЙСТВУЙ ИЗ ВЫБОРА • упрощай при напряжении • делай меньше, но стабильно • создавай устойчивую систему'
+    };
+
+    const preloadedDays = {
+      '2026-04-01': {
+        header: { title: 'ПЛАН ДНЯ', date: '1 апреля 2026', day: 'среда' },
+        aiQuote: { icon: '👉', text: 'Главный вопрос сегодня: это создаёт устойчивость или просто создаёт движение?' },
+        aiResponse: {
+          changed: 'Загружен актуальный план на среду.',
+          why: 'Действуем согласно установленному вектору.',
+          recommendation: 'Фокус на базовых касаниях и генерации идей.'
+        },
+        blocks: [
+          {
+            id: 'practices_01', title: 'ПРАКТИКИ И РУТИНА', color: 'bg-[#548C5F]', icon: '🧘‍♀️', isCollapsed: true,
+            tasks: [
+              { id: '01_p1', title: 'подъём до 8', done: false },
+              { id: '01_p2', title: 'коктейль', done: false },
+              { id: '01_p3', title: 'дыхание', done: false },
+              { id: '01_p4', title: 'медитация', done: false }
+            ]
+          },
+          {
+            id: 'focus_01', title: 'ДЕНЬ — Фокус', color: 'bg-[#CC823F]', icon: '🎯', tag: 'главное',
+            tasks: [
+              { id: '01_f1', title: '3 касания (деньги): Гуля', done: false },
+              { id: '01_f2', title: 'дежурство в Маяке', done: false },
+              { id: '01_f3', title: 'погенерить идеи по платформе', done: false },
+              { id: '01_f4', title: 'выложить пост', done: false }
+            ]
+          },
+          {
+            id: 'pause_01', title: 'ПАУЗА И НАПОЛНЕНИЕ', color: 'bg-[#92978B]', icon: '☕',
+            tasks: [
+              { id: '01_pa1', title: 'Обед', done: false },
+              { id: '01_pa2', title: 'чтение', done: false }
+            ]
+          }
+        ],
+        footerAlerts: [{ type: 'warning', icon: '👉', text: 'Стопорим на уровне «достаточно хорошо»' }],
+        globalMotto: 'ДЕЙСТВУЙ ИЗ ВЫБОРА • упрощай при напряжении • делай меньше, но стабильно'
+      },
+      '2026-04-02': {
+        header: { title: 'ПЛАН ДНЯ', date: '2 апреля 2026', day: 'четверг' },
+        aiQuote: { icon: '👉', text: 'Закрепляем базовую систему и сохраняем один вектор.' },
+        aiResponse: null,
+        blocks: [
+          {
+            id: 'practices_02', title: 'ПРАКТИКИ И РУТИНА', color: 'bg-[#548C5F]', icon: '🧘‍♀️', isCollapsed: true,
+            tasks: [
+              { id: '02_p1', title: 'Подъём в 6', done: false },
+              { id: '02_p2', title: 'практики + прогулка', done: false },
+              { id: '02_p3', title: 'Завтрак', done: false }
+            ]
+          },
+          {
+            id: 'focus_02', title: 'ДЕНЬ — Фокус', color: 'bg-[#CC823F]', icon: '🎯', tag: 'главное',
+            tasks: [
+              { id: '02_f1', title: 'Записаться на флюрографию', done: false },
+              { id: '02_f2', title: 'Сделать флюорографию', done: false },
+              { id: '02_f3', title: 'Оплатить деньги за аренду', done: false },
+              { id: '02_f4', title: 'Создать деньги на поездку', done: false },
+              { id: '02_f5', title: 'поездка в Поляну', done: false },
+              { id: '02_f6', title: '3 касания', done: false },
+              { id: '02_f7', title: '16:00 практикум ФБ', done: false },
+              { id: '02_f8', title: 'погенерить страницы для Маяка', done: false },
+              { id: '02_f9', title: 'Контент', done: false }
+            ]
+          },
+          {
+            id: 'pause_02', title: 'ПАУЗА', color: 'bg-[#92978B]', icon: '☕',
+            tasks: [
+              { id: '02_pa1', title: 'Обед', done: false }
+            ]
+          }
+        ],
+        footerAlerts: [],
+        globalMotto: 'ДЕЙСТВУЙ ИЗ ВЫБОРА • упрощай при напряжении • делай меньше, но стабильно'
+      },
+      '2026-04-03': {
+        header: { title: 'ПЛАН ДНЯ', date: '3 апреля 2026', day: 'пятница' },
+        aiQuote: { icon: '👉', text: 'Эксперимент вместо идеального решения.' },
+        aiResponse: null,
+        blocks: [
+          {
+            id: 'practices_03', title: 'ПРАКТИКИ И РУТИНА', color: 'bg-[#548C5F]', icon: '🧘‍♀️', isCollapsed: true,
+            tasks: [
+              { id: '03_p1', title: 'практики', done: false },
+              { id: '03_p2', title: 'Завтрак', done: false }
+            ]
+          },
+          {
+            id: 'focus_03', title: 'ДЕНЬ — Фокус', color: 'bg-[#CC823F]', icon: '🎯', tag: 'главное',
+            tasks: [
+              { id: '03_f1', title: 'Записаться к терапевту', done: false },
+              { id: '03_f2', title: '3–5 касаний', done: false },
+              { id: '03_f3', title: '14:00 вокал', done: false },
+              { id: '03_f4', title: '16:00 практикум ИР', done: false },
+              { id: '03_f5', title: 'начать налоговую', done: false },
+              { id: '03_f6', title: 'Погенерить для маяка', done: false },
+              { id: '03_f7', title: 'Контент', done: false },
+              { id: '03_f8', title: 'Сдать конспект', done: false },
+              { id: '03_f9', title: 'Итоги месяца', done: false }
+            ]
+          },
+          {
+            id: 'pause_03', title: 'ПАУЗА', color: 'bg-[#92978B]', icon: '☕',
+            tasks: [
+              { id: '03_pa1', title: 'Обед', done: false }
+            ]
+          }
+        ],
+        footerAlerts: [],
+        globalMotto: 'ДЕЙСТВУЙ ИЗ ВЫБОРА • упрощай при напряжении • делай меньше, но стабильно'
+      },
+      '2026-04-04': {
+        header: { title: 'ПЛАН ДНЯ', date: '4 апреля 2026', day: 'суббота' },
+        aiQuote: { icon: '👉', text: 'Удерживаем простую систему действий.' },
+        aiResponse: null,
+        blocks: [
+          {
+            id: 'practices_04', title: 'ПРАКТИКИ И РУТИНА', color: 'bg-[#548C5F]', icon: '🧘‍♀️', isCollapsed: true,
+            tasks: [
+              { id: '04_p1', title: 'практики', done: false },
+              { id: '04_p2', title: 'Завтрак', done: false }
+            ]
+          },
+          {
+            id: 'focus_04', title: 'ДЕНЬ — Фокус', color: 'bg-[#CC823F]', icon: '🎯', tag: 'главное',
+            tasks: [
+              { id: '04_f1', title: '3 касания', done: false },
+              { id: '04_f2', title: 'дежурство', done: false }
+            ]
+          },
+          {
+            id: 'pause_04', title: 'ПАУЗА', color: 'bg-[#92978B]', icon: '☕',
+            tasks: [
+              { id: '04_pa1', title: 'Обед', done: false }
+            ]
+          }
+        ],
+        footerAlerts: [],
+        globalMotto: 'ДЕЙСТВУЙ ИЗ ВЫБОРА • упрощай при напряжении • делай меньше, но стабильно'
+      },
+      '2026-04-05': {
+        header: { title: 'ПЛАН ДНЯ', date: '5 апреля 2026', day: 'воскресенье' },
+        aiQuote: { icon: '👉', text: 'Восстановление ресурса — часть устойчивой системы.' },
+        aiResponse: null,
+        blocks: [
+          {
+            id: 'focus_05', title: 'ДЕНЬ — Фокус', color: 'bg-[#CC823F]', icon: '🎯', tag: 'главное',
+            tasks: [
+              { id: '05_f1', title: 'День без интернета', done: false }
+            ]
+          }
+        ],
+        footerAlerts: [],
+        globalMotto: 'ДЕЙСТВУЙ ИЗ ВЫБОРА • упрощай при напряжении • делай меньше, но стабильно'
+      }
+    };
+
+    const planSchema = {
+      type: "OBJECT",
+      properties: {
+        header: { type: "OBJECT", properties: { title: {type: "STRING"}, date: {type: "STRING"}, day: {type: "STRING"} } },
+        aiQuote: { type: "OBJECT", properties: { icon: {type: "STRING"}, text: {type: "STRING"} } },
+        aiResponse: { 
+          type: "OBJECT", 
+          properties: { 
+            changed: {type: "STRING"}, 
+            why: {type: "STRING"}, 
+            recommendation: {type: "STRING"} 
+          } 
+        },
+        blocks: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              id: {type: "STRING"}, title: {type: "STRING"}, color: {type: "STRING"}, icon: {type: "STRING"}, tag: {type: "STRING"}, isCollapsed: {type: "BOOLEAN"},
+              subtitle: { type: "OBJECT", properties: { icon: {type: "STRING"}, text: {type: "STRING"} } },
+              tasks: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: { id: {type: "STRING"}, title: {type: "STRING"}, done: {type: "BOOLEAN"}, isSub: {type: "BOOLEAN"}, time: {type: "STRING"} }
+                }
+              },
+              footerNote: { type: "OBJECT", properties: { icon: {type: "STRING"}, text: {type: "STRING"} } }
+            }
+          }
+        },
+        footerAlerts: { type: "ARRAY", items: { type: "OBJECT", properties: { type: {type: "STRING"}, icon: {type: "STRING"}, text: {type: "STRING"} } } },
+        globalMotto: {type: "STRING"}
+      }
+    };
+
+    const apiKey = ""; 
+
+    const generateAIPlan = async (userPrompt, currentData, contextData, chatHistory) => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      
+      const systemInstructionText = `
+        Ты — навигатор мышления и системы. Ты работаешь как система, помогающая двигаться из хаоса в устойчивость.
+        Твоя задача — собирать день как систему, удерживать фокус, предотвращать перегруз и помогать принимать решения.
+        Ты учитываешь: стратегию (квартал, месяц), текущий этап, правила системы и состояние пользователя.
+        Ты анализируешь и корректируешь. Если действие ведёт к перегрузу или хаосу — ты предлагаешь более устойчивый вариант.
+
+        Порядок твоего анализа:
+        1. Определи состояние (ресурс / перегруз / избегание).
+        2. Сверь с этапом (сейчас этап закрепления или расширения?).
+        3. Сверь с правилами.
+        4. Определи приоритет (что является ключевым фокусом дня?).
+        5. Прими решение: оставить, убрать, сократить, перенести, добавить.
+        6. Собери новый день как систему (с блоками и ограничением нагрузки).
+
+        Типы твоих действий:
+        1. Пересборка дня: При запросе об изменении или тяжести → сокращай план, оставляй только ключ, переноси остальное.
+        2. Добавление: Встраивай в систему. При перегрузе → предлагай альтернативу.
+        3. Ограничение: Если задач слишком много → уменьшай, объясняй почему.
+        4. Сверка со стратегией: Если задача мимо стратегии → указывай это, предлагай вариант.
+        5. Включение "минимального режима": При перегрузе убирай всё лишнее.
+
+        ГЛАВНОЕ ПРАВИЛО (КРИТИЧНО): Ты стабилизируешь систему. Лучше меньше действий, но выполненных, чем большой план, который развалится.
+
+        Анти-ошибки:
+        ЗАПРЕЩЕНО: давать мотивационные советы, писать абстрактно, игнорировать перегруз, увеличивать количество задач без анализа.
+        РАЗРЕШЕНО: сокращать, упрощать, ограничивать, предлагать минимальный вариант.
+
+        Лексикон: пиши утвердительными предложениями. Исключи слова: попробую, постараюсь, пытаюсь, сложно, случилось, получилось, а также частицы отрицания.
+
+        Формат ответа (заполни блок aiResponse в JSON строго тремя частями):
+        1. changed (Что я изменил): Четкий список.
+        2. why (Почему): Причина с опорой на контекст.
+        3. recommendation (На что обратить внимание): Фокус на стабилизацию.
+        
+        Сохраняй цветовую кодировку. Добавляй уникальные id новым задачам.
+      `;
+
+      const contextText = `
+        [СТРАТЕГИЯ КВАРТАЛА]: ${contextData.quarter}
+        [СТРАТЕГИЯ МЕСЯЦА]: ${contextData.month}
+        [ТЕКУЩИЙ ЭТАП]: ${contextData.stage}
+        [ПРАВИЛА СИСТЕМЫ]: ${contextData.rules}
+        [ПЛАН НА НЕДЕЛЮ]: ${contextData.week}
+      `;
+      
+      const recentHistory = chatHistory.slice(-5);
+      const historyText = recentHistory.map(h => `Запрос: ${h.request} | Ответ: ${h.response?.changed || ''}`).join('\n');
+
+      const userRequestText = `
+        КОНТЕКСТ ПРОЕКТА:
+        ${contextText}
+
+        ИСТОРИЯ ИЗМЕНЕНИЙ:
+        ${historyText}
+        
+        НОВЫЙ ЗАПРОС: «${userPrompt}». 
+        Текущий план: ${JSON.stringify(currentData)}. 
+        Пересобери план.
+      `;
+
+      const payload = {
+        contents: [{ parts: [{ text: userRequestText }] }],
+        systemInstruction: { parts: [{ text: systemInstructionText }] },
+        generationConfig: { responseMimeType: "application/json", responseSchema: planSchema }
+      };
+
+      for (let i = 0; i < 5; i++) {
+        try {
+          const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+          if (response.ok === false) throw new Error(`HTTP error! status: ${response.status}`);
+          const result = await response.json();
+          const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) return JSON.parse(text);
+        } catch (e) {
+          if (i === 4) throw e;
+          await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+        }
+      }
+    };
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('plan'); 
+      const [selectedDateStr, setSelectedDateStr] = useState('2026-04-01');
+
+      // Хранилище всех дней
+      const [daysData, setDaysData] = useState(() => {
+        try {
+          const savedDays = localStorage.getItem('tracker_days_data_v2');
+          if (savedDays) return JSON.parse(savedDays);
+          return preloadedDays;
+        } catch (e) {
+          return preloadedDays;
+        }
+      });
+
+      // Получаем данные текущего выбранного дня (или генерируем пустой шаблон)
+      const dateInfo = getFormattedDateInfo(selectedDateStr);
+      const data = daysData[selectedDateStr] || { 
+        ...emptyDayTemplate, 
+        header: { title: 'ПЛАН ДНЯ', date: dateInfo.date, day: dateInfo.day }
+      };
+
+      // Функция для обновления конкретного дня
+      const updateCurrentDay = (updater) => {
+        setDaysData(prev => {
+          const current = prev[selectedDateStr] || { 
+            ...emptyDayTemplate, 
+            header: { title: 'ПЛАН ДНЯ', date: dateInfo.date, day: dateInfo.day }
+          };
+          const updated = typeof updater === 'function' ? updater(current) : updater;
+          return { ...prev, [selectedDateStr]: updated };
+        });
+      };
+
+      const [prompt, setPrompt] = useState('');
+      const [isLoading, setIsLoading] = useState(false);
+      const [isListening, setIsListening] = useState(false);
+      
+      // История
+      const [chatHistory, setChatHistory] = useState(() => {
+        try {
+          const saved = localStorage.getItem('tracker_history_v2');
+          return saved ? JSON.parse(saved) : [
+            {
+              id: Date.now(),
+              date: '1 апреля 2026',
+              request: 'Инициализация системы',
+              response: { changed: 'Загружен актуальный план.', why: 'Синхронизация данных завершена.', recommendation: 'Система готова к работе.' }
+            }
+          ];
+        } catch (e) {
+          return [];
+        }
+      });
+
+      // Контекст системы
+      const [contextData, setContextData] = useState(() => {
+        try {
+          const saved = localStorage.getItem('tracker_context_v2');
+          return saved ? JSON.parse(saved) : {
+            quarter: 'Я перехожу из нестабильного движения в устойчивую систему. Моя задача — выстроить основу, которая даёт предсказуемый результат, исключая лишние действия. Фокус: стабилизация дохода, сборка системы действий, переход от рывков к регулярности. Я двигаюсь через ясную структуру и повторяемые действия, полностью отпуская перегруз и доказательство. Главный вопрос: это создаёт устойчивость или просто создаёт движение?',
+            month: 'Моя задача — закрепить базовую систему дня и начать двигаться стабильно. Фокус: ежедневное проявление, регулярные касания с деньгами, удержание одного вектора. Я фокусируюсь на главном и учусь удерживать простую систему. Важно: сохранять простоту, следовать одному направлению, действовать в текущем состоянии. Критерий: я делаю каждый день, даже если совсем немного.',
+            stage: 'Я нахожусь в точке перехода от понимания к устойчивой реализации. Я уже вижу систему и учусь удерживать её в действиях. Это этап: закрепления, упрощения, повторения. Риски: перегруз, расфокус, попытка сделать больше своих возможностей. Моя задача: делать меньше, но стабильно. Основной принцип: эксперимент вместо идеального решения.',
+            rules: 'Я строю день как систему, а вместо обычного списка задач использую четкую структуру. Правила: у меня есть один главный фокус дня; я делаю главное первым; я сохраняю легкость; при напряжении — я упрощаю; база (тело и состояние) обязательна; деньги — это регулярные действия; при тяжести — я включаю минимальный план. Я создаю устойчивую систему своей жизни. Действую из выбора и легкости, полностью исключая напряжение.',
+            week: 'Собран актуальный план на начало апреля.'
+          };
+        } catch (e) {
+          return {};
+        }
+      });
+
+      // Автосохранение
+      useEffect(() => {
+        localStorage.setItem('tracker_days_data_v2', JSON.stringify(daysData));
+      }, [daysData]);
+
+      useEffect(() => {
+        localStorage.setItem('tracker_history_v2', JSON.stringify(chatHistory));
+      }, [chatHistory]);
+
+      useEffect(() => {
+        localStorage.setItem('tracker_context_v2', JSON.stringify(contextData));
+      }, [contextData]);
+
+      const handleVoiceInput = () => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'ru-RU';
+          recognition.onstart = () => setIsListening(true);
+          recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            setPrompt(prev => prev ? `${prev} ${transcript}` : transcript);
+          };
+          recognition.onend = () => setIsListening(false);
+          recognition.start();
+        } else {
+          alert('Функция голосового ввода активируется через микрофон на клавиатуре устройства.');
+        }
+      };
+
+      const handleAIUpdate = async () => {
+        if (prompt.trim() === '' || isLoading) return;
+        setIsLoading(true);
+        try {
+          const currentPrompt = prompt;
+          const newData = await generateAIPlan(currentPrompt, data, contextData, chatHistory);
+          
+          if (newData) {
+            updateCurrentDay(newData);
+            setPrompt('');
+            
+            setChatHistory(prev => [
+              {
+                id: Date.now(),
+                date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                request: currentPrompt,
+                response: newData.aiResponse
+              },
+              ...prev
+            ]);
+            
+            setActiveTab('navigator');
+          }
+        } catch (error) {
+          console.error("Ошибка ИИ:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const toggleTask = (blockId, taskId) => {
+        updateCurrentDay(prevData => {
+          const newBlocks = prevData.blocks?.map(block => {
+            if (block.id === blockId) {
+              return {
+                ...block,
+                tasks: block.tasks?.map(task => 
+                  task.id === taskId ? { ...task, done: !task.done } : task
+                )
+              };
+            }
+            return block;
+          });
+          return { ...prevData, blocks: newBlocks };
+        });
+      };
+
+      const handleTaskEdit = (blockId, taskId, newTitle) => {
+        updateCurrentDay(prevData => {
+          const newBlocks = prevData.blocks?.map(block => {
+            if (block.id === blockId) {
+              return {
+                ...block,
+                tasks: block.tasks?.map(task =>
+                  task.id === taskId ? { ...task, title: newTitle } : task
+                )
+              };
+            }
+            return block;
+          });
+          return { ...prevData, blocks: newBlocks };
+        });
+      };
+
+      const handleTaskDelete = (blockId, taskId) => {
+        updateCurrentDay(prevData => {
+          const newBlocks = prevData.blocks?.map(block => {
+            if (block.id === blockId) {
+              return {
+                ...block,
+                tasks: block.tasks?.filter(task => task.id !== taskId)
+              };
+            }
+            return block;
+          });
+          return { ...prevData, blocks: newBlocks };
+        });
+      };
+
+      const handleTaskAdd = (blockId) => {
+        updateCurrentDay(prevData => {
+          const newBlocks = prevData.blocks?.map(block => {
+            if (block.id === blockId) {
+              return {
+                ...block,
+                tasks: [...(block.tasks || []), { id: `manual_${Date.now()}`, title: '', done: false }]
+              };
+            }
+            return block;
+          });
+          return { ...prevData, blocks: newBlocks };
+        });
+      };
+
+      const toggleBlockCollapse = (blockId) => {
+        updateCurrentDay(prevData => {
+          const newBlocks = prevData.blocks?.map(block => {
+            if (block.id === blockId) {
+              return { ...block, isCollapsed: !block.isCollapsed };
+            }
+            return block;
+          });
+          return { ...prevData, blocks: newBlocks };
+        });
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-50 pb-12 font-sans text-gray-800">
+          
+          {/* Шапка */}
+          <div className="bg-[#5B83A6] text-white p-4 shadow-md sticky top-0 z-20 flex flex-col items-center justify-center">
+            <h1 className="text-lg md:text-xl font-bold tracking-wide uppercase">
+              {renderSafe(data?.header?.title)} · {renderSafe(data?.header?.date)} · <span className="lowercase">{renderSafe(data?.header?.day)}</span>
+            </h1>
+
+            {/* Навигатор по датам */}
+            <div className="flex items-center justify-between w-full max-w-sm mt-3 bg-white/10 rounded-sm p-1">
+              <button 
+                onClick={() => setSelectedDateStr(shiftDate(selectedDateStr, -1))}
+                className="p-1 hover:bg-white/20 rounded-sm transition-colors text-white"
+                title="Предыдущий день"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              
+              <div className="flex flex-col items-center">
+                <span className="text-xs font-bold uppercase tracking-wider">{getFormattedDateInfo(selectedDateStr).day}</span>
+                <input 
+                  type="date" 
+                  value={selectedDateStr}
+                  onChange={(e) => { if(e.target.value) setSelectedDateStr(e.target.value) }}
+                  className="bg-transparent text-white text-sm font-medium focus:outline-none text-center cursor-pointer [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                />
+              </div>
+
+              <button 
+                onClick={() => setSelectedDateStr(shiftDate(selectedDateStr, 1))}
+                className="p-1 hover:bg-white/20 rounded-sm transition-colors text-white"
+                title="Следующий день"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </div>
+            
+            {/* Панель навигации */}
+            <div className="grid grid-cols-4 gap-1 sm:gap-2 mt-4 bg-[#4A6B8A] p-1 rounded-sm w-full max-w-2xl">
+              {[
+                { id: 'plan', label: 'ДЕНЬ' },
+                { id: 'navigator', label: 'НАВИГАТОР' },
+                { id: 'context', label: 'КОНТЕКСТ' },
+                { id: 'history', label: 'ИСТОРИЯ' }
+              ].map(tab => (
+                <button 
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold tracking-wide transition-colors rounded-sm text-center
+                    ${activeTab === tab.id ? 'bg-white text-[#5B83A6] shadow-sm' : 'text-white hover:bg-white/10'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="max-w-3xl mx-auto px-2 md:px-4 mt-6">
+
+            {/* --- ЭКРАН 1: ДЕНЬ --- */}
+            {activeTab === 'plan' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex flex-col gap-5">
+                  {Array.isArray(data?.blocks) && data.blocks.map(block => (
+                    <div key={block.id} className="bg-white border border-gray-200 shadow-sm rounded-sm overflow-hidden">
+                      
+                      <div 
+                        className={`${block.color || 'bg-gray-500'} text-white p-2 px-3 flex justify-between items-center ${block.tasks && block.tasks.length > 0 ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
+                        onClick={() => toggleBlockCollapse(block.id)}
+                      >
+                        <div className="flex items-center gap-2 font-bold text-sm md:text-base tracking-wide">
+                          <span>{block.icon || '📌'}</span>
+                          <h2 className="uppercase">{renderSafe(block.title)}</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {block.tag && (
+                            <span className="text-xs md:text-sm italic opacity-90 font-medium mr-1">
+                              {renderSafe(block.tag)}
+                            </span>
+                          )}
+                          <svg 
+                            className={`w-5 h-5 transition-transform duration-200 ${block.isCollapsed ? '' : 'rotate-180'}`} 
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {!block.isCollapsed && (
+                        <>
+                          {block.subtitle && block.subtitle.text && (
+                            <div className="bg-[#FFF8D6] border-b border-gray-200 text-[#8C7B3E] px-3 py-1.5 text-xs md:text-sm flex items-start gap-2 italic">
+                              <span className="shrink-0">{block.subtitle.icon || '👉'}</span>
+                              <p>{renderSafe(block.subtitle.text)}</p>
+                            </div>
+                          )}
+
+                          <div className="flex flex-col">
+                            <div className="hidden md:flex border-b border-gray-200 bg-gray-50 text-xs text-gray-500 font-semibold px-3 py-1">
+                              <div className="w-10 text-center">✓</div>
+                              <div className="flex-1 border-l border-gray-200 pl-3">Задача</div>
+                              <div className="w-40 border-l border-gray-200 pl-3">Заметка / время</div>
+                            </div>
+
+                            {Array.isArray(block.tasks) && block.tasks.map((task) => (
+                              <div 
+                                key={task.id} 
+                                className={`flex items-stretch border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors group ${task.done ? 'bg-gray-50/50' : ''}`}
+                              >
+                                <div 
+                                  onClick={() => toggleTask(block.id, task.id)}
+                                  className="w-12 md:w-10 flex items-center justify-center py-2 shrink-0 cursor-pointer"
+                                >
+                                  <div className={`w-5 h-5 md:w-4 md:h-4 border rounded-sm flex items-center justify-center transition-all ${task.done ? 'bg-gray-700 border-gray-700 text-white' : 'border-gray-400 bg-white'}`}>
+                                    {task.done && <svg className="w-3 h-3 md:w-2.5 md:h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
+                                  </div>
+                                </div>
+                                
+                                <div className={`flex-1 py-2 pr-3 border-l border-gray-100 pl-3 flex flex-col justify-center ${task.isSub ? 'pl-8' : ''}`}>
+                                  <input 
+                                    type="text"
+                                    value={typeof task.title === 'string' ? task.title : (task.title ? String(task.title) : '')}
+                                    onChange={(e) => handleTaskEdit(block.id, task.id, e.target.value)}
+                                    className={`w-full bg-transparent focus:outline-none text-sm md:text-base ${task.done ? 'line-through text-gray-400' : 'text-gray-800'} ${task.isSub && !task.done ? 'text-gray-600' : ''}`}
+                                    placeholder="Новая задача..."
+                                  />
+                                  {task.time && (
+                                    <span className="md:hidden text-xs text-gray-500 mt-0.5">{renderSafe(task.time)}</span>
+                                  )}
+                                </div>
+
+                                <div className="hidden md:flex w-40 border-l border-gray-100 pl-3 py-2 items-center text-xs text-gray-500">
+                                  {renderSafe(task.time)}
+                                </div>
+
+                                <button
+                                  onClick={() => handleTaskDelete(block.id, task.id)}
+                                  className="px-3 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center"
+                                  title="Удалить задачу"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        
+                        <button 
+                          onClick={() => handleTaskAdd(block.id)}
+                          className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 text-xs font-bold uppercase tracking-wide transition-colors border-t border-gray-100 text-center"
+                        >
+                          + Добавить задачу
+                        </button>
+
+                        {block.footerNote && block.footerNote.text && (
+                          <div className="bg-[#FFF8D6] text-[#8C7B3E] px-3 py-1.5 text-xs md:text-sm flex items-start gap-2 italic">
+                            <span className="shrink-0">{block.footerNote.icon || '👉'}</span>
+                            <p>{renderSafe(block.footerNote.text)}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-8 flex flex-col gap-2">
+                  {Array.isArray(data?.footerAlerts) && data.footerAlerts.map((alert, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`p-2 px-3 flex items-start gap-2 text-sm md:text-base font-medium rounded-sm border 
+                        ${alert.type === 'danger' ? 'bg-[#FDF0F0] text-[#B85C5C] border-[#F2D6D6]' : 'bg-[#FFF8D6] text-[#8C7B3E] border-[#E8D9A8]'}`}
+                    >
+                      <span className="shrink-0">{alert.icon || '👉'}</span>
+                      <p>{renderSafe(alert.text)}</p>
+                    </div>
+                  ))}
+
+                  {data?.globalMotto && (
+                    <div className="mt-4 bg-[#FFF8D6] border-2 border-[#E8D9A8] text-[#8C7B3E] p-4 text-center font-bold text-sm md:text-base uppercase tracking-wide rounded-sm shadow-sm">
+                      {renderSafe(data.globalMotto)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* --- ЭКРАН 2: НАВИГАТОР --- */}
+            {activeTab === 'navigator' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-6">
+                
+                <div className="bg-white border border-[#5B83A6] p-4 sm:p-6 rounded-sm shadow-sm flex flex-col gap-4">
+                  <label className="text-sm font-bold text-[#5B83A6] uppercase tracking-wide">Дать вводные нейросети:</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <textarea 
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Надиктуй изменения..."
+                        className="w-full border border-gray-300 rounded-sm pl-3 pr-12 py-3 text-sm focus:outline-none focus:border-[#5B83A6] focus:ring-1 focus:ring-[#5B83A6] min-h-[80px] resize-y"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAIUpdate();
+                          }
+                        }}
+                        disabled={isLoading}
+                      />
+                      <button
+                        onClick={handleVoiceInput}
+                        disabled={isLoading || isListening}
+                        className={`absolute right-3 top-3 p-2 rounded-full transition-colors shadow-sm border ${
+                          isListening ? 'bg-red-100 text-red-600 border-red-200 animate-pulse' : 'bg-white text-gray-500 border-gray-200 hover:text-[#5B83A6] hover:border-[#5B83A6]'
+                        }`}
+                        title="Диктовать голосом"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                        </svg>
+                      </button>
+                    </div>
+                    <button 
+                      onClick={handleAIUpdate}
+                      disabled={isLoading || prompt.trim() === ''}
+                      className="bg-[#5B83A6] text-white px-8 py-3 text-sm font-bold rounded-sm hover:bg-[#4A6B8A] transition-colors disabled:opacity-50 whitespace-nowrap h-fit"
+                    >
+                      {isLoading ? 'Анализирую...' : 'Пересобрать день'}
+                    </button>
+                  </div>
+                </div>
+
+                {data?.aiResponse && (
+                  <div className="flex flex-col gap-3">
+                    <h3 className="font-bold text-gray-500 uppercase tracking-wide text-xs ml-1">🤖 Ответ системы</h3>
+                    
+                    <div className="bg-white border-l-4 border-[#3C6D9D] p-4 shadow-sm rounded-sm">
+                      <span className="text-[10px] font-bold text-[#3C6D9D] uppercase tracking-wide bg-[#E8F0FE] px-2 py-0.5 rounded-sm">Что я изменил</span>
+                      <p className="text-gray-800 text-sm md:text-base mt-2 whitespace-pre-line">{renderSafe(data.aiResponse.changed)}</p>
+                    </div>
+
+                    <div className="bg-white border-l-4 border-[#CC823F] p-4 shadow-sm rounded-sm">
+                      <span className="text-[10px] font-bold text-[#CC823F] uppercase tracking-wide bg-[#FFF3E8] px-2 py-0.5 rounded-sm">Почему</span>
+                      <p className="text-gray-800 text-sm md:text-base mt-2 whitespace-pre-line">{renderSafe(data.aiResponse.why)}</p>
+                    </div>
+
+                    <div className="bg-white border-l-4 border-[#548C5F] p-4 shadow-sm rounded-sm">
+                      <span className="text-[10px] font-bold text-[#548C5F] uppercase tracking-wide bg-[#E8F5E9] px-2 py-0.5 rounded-sm">На что обратить внимание</span>
+                      <p className="text-gray-800 text-sm md:text-base mt-2 whitespace-pre-line">{renderSafe(data.aiResponse.recommendation)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {data?.aiQuote && (
+                  <div className="bg-[#FFF8D6] border border-[#E8D9A8] text-[#8C7B3E] p-4 flex items-start gap-3 shadow-sm rounded-sm text-sm md:text-base font-medium mt-4">
+                    <span className="shrink-0 text-xl">{data.aiQuote.icon || '👉'}</span>
+                    <p>{renderSafe(data.aiQuote.text)}</p>
+                  </div>
+                )}
+                
+              </div>
+            )}
+
+            {/* --- ЭКРАН 3: КОНТЕКСТ --- */}
+            {activeTab === 'context' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-4">
+                <div className="bg-[#FFF8D6] border border-[#E8D9A8] text-[#8C7B3E] p-4 text-sm font-medium rounded-sm">
+                  <span className="font-bold uppercase tracking-wide">🎯 Правила игры</span>
+                  <p className="mt-1">Опиши свою стратегию здесь. Нейросеть применяет эти данные для защиты от хаоса.</p>
+                </div>
+
+                {[
+                  { id: 'quarter', label: 'Стратегия квартала', color: 'border-[#3C6D9D]', bg: 'bg-[#F4F8FB]', text: 'text-[#3C6D9D]' },
+                  { id: 'month', label: 'Стратегия месяца', color: 'border-[#548C5F]', bg: 'bg-[#F2F9F3]', text: 'text-[#548C5F]' },
+                  { id: 'stage', label: 'Текущий этап', color: 'border-[#CC823F]', bg: 'bg-[#FFF9F4]', text: 'text-[#CC823F]' },
+                  { id: 'rules', label: 'Правила системы', color: 'border-[#7D6195]', bg: 'bg-[#F8F5FB]', text: 'text-[#7D6195]' },
+                  { id: 'week', label: 'План на неделю', color: 'border-[#888B4B]', bg: 'bg-[#F6F7F0]', text: 'text-[#888B4B]' }
+                ].map(item => (
+                  <div key={item.id} className={`bg-white border-l-4 ${item.color} p-4 rounded-sm shadow-sm flex flex-col gap-2`}>
+                    <label className={`font-bold uppercase text-xs tracking-wide ${item.text} ${item.bg} w-fit px-2 py-0.5 rounded-sm`}>
+                      {item.label}
+                    </label>
+                    <textarea 
+                      value={contextData[item.id] || ''}
+                      onChange={(e) => setContextData(prev => ({ ...prev, [item.id]: e.target.value }))}
+                      className="w-full text-sm text-gray-800 min-h-[80px] focus:outline-none resize-y pt-2"
+                      placeholder={`Опиши ${item.label.toLowerCase()}...`}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* --- ЭКРАН 4: ИСТОРИЯ --- */}
+            {activeTab === 'history' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-4">
+                <div className="bg-[#FFF8D6] border border-[#E8D9A8] text-[#8C7B3E] p-4 text-sm font-medium rounded-sm">
+                  <span className="font-bold uppercase tracking-wide">📜 Журнал трансформаций</span>
+                  <p className="mt-1">Здесь видны паттерны твоих решений и корректировок.</p>
+                </div>
+
+                <div className="flex flex-col gap-4 relative">
+                  <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>
+                  
+                  {chatHistory.map((item, index) => (
+                    <div key={item.id} className="relative z-10 pl-10">
+                      <div className="absolute left-[11px] top-4 w-3 h-3 rounded-full bg-[#5B83A6] ring-4 ring-gray-50"></div>
+                      
+                      <div className="bg-white border border-gray-200 rounded-sm shadow-sm overflow-hidden">
+                        <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex justify-between items-center text-xs text-gray-500 font-bold uppercase">
+                          <span>Запрос</span>
+                          <span>{renderSafe(item.date)}</span>
+                        </div>
+                        <div className="p-4 text-sm text-gray-800 italic">
+                          «{renderSafe(item.request)}»
+                        </div>
+                        
+                        {item.response && item.response.changed && (
+                          <div className="border-t border-gray-100 p-4 bg-gray-50/50 flex flex-col gap-2">
+                            <div className="flex gap-2 items-start text-sm">
+                              <span className="font-bold text-[#3C6D9D] shrink-0 text-xs mt-0.5 uppercase">Действие:</span>
+                              <span className="text-gray-700">{renderSafe(item.response.changed)}</span>
+                            </div>
+                            <div className="flex gap-2 items-start text-sm">
+                              <span className="font-bold text-[#CC823F] shrink-0 text-xs mt-0.5 uppercase">Причина:</span>
+                              <span className="text-gray-700">{renderSafe(item.response.why)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
