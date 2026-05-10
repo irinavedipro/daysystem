@@ -47,6 +47,141 @@
       return date.toISOString().split('T')[0];
     };
 
+    const createEmptyDailyEntry = (dateString) => ({
+      date: dateString,
+      sleep_quality: 5,
+      energy: 5,
+      tension: 0,
+      clarity: 5,
+      anxiety: 0,
+      body_contact: 5,
+      body_support: {
+        water: false,
+        protein: false,
+        warm_food: false,
+        movement_or_air: false,
+        pause_or_breathing: false
+      },
+      main_contour_action: {
+        title: '',
+        status: 'planned',
+        why_this_action: ''
+      },
+      decision_check: {
+        action_title: '',
+        prove_or_create: '',
+        contraction_or_expansion: '',
+        control_or_allow: '',
+        avoid_or_stay: '',
+        new_or_reaction: '',
+        note: ''
+      },
+      recovery: {
+        planned: '',
+        what_helped: '',
+        minutes: 0
+      },
+      result: {
+        what_i_created: '',
+        what_i_held: '',
+        small_win: ''
+      }
+    });
+
+    const getSystemMode = (entry) => {
+      const tension = Number(entry?.tension || 0);
+      const anxiety = Number(entry?.anxiety || 0);
+      const energy = Number(entry?.energy || 0);
+      const clarity = Number(entry?.clarity || 0);
+
+      if (tension >= 8 || anxiety >= 8 || clarity <= 3) return 'перегруз';
+      if (energy <= 3 && clarity <= 4) return 'замирание';
+      if ((tension >= 5 && tension <= 7) || (anxiety >= 5 && anxiety <= 7) || (clarity >= 4 && clarity <= 6)) return 'мобилизация';
+      if (tension <= 4 && anxiety <= 4 && energy >= 5 && clarity >= 6) return 'ресурс';
+      return 'наблюдение';
+    };
+
+    const modeCards = {
+      'ресурс': {
+        color: 'border-[#548C5F] bg-[#F2F9F3] text-[#2F6B3D]',
+        title: 'Ресурс',
+        text: 'Я оставляю одно главное действие и фиксирую результат.'
+      },
+      'мобилизация': {
+        color: 'border-[#CC823F] bg-[#FFF6ED] text-[#9A5B20]',
+        title: 'Мобилизация',
+        text: 'Я сокращаю план, добавляю паузу и не ускоряюсь.'
+      },
+      'перегруз': {
+        color: 'border-[#B85C5C] bg-[#FDF0F0] text-[#9B3F3F]',
+        title: 'Перегруз',
+        text: 'Минимальный день: вода, еда, воздух, 5 минут тишины и одно маленькое действие.'
+      },
+      'замирание': {
+        color: 'border-[#92978B] bg-[#F5F5F2] text-[#62675D]',
+        title: 'Замирание',
+        text: 'Я не строю стратегию. Я возвращаюсь в тело и выбираю шаг на 5 минут.'
+      },
+      'наблюдение': {
+        color: 'border-[#5B83A6] bg-[#F4F8FB] text-[#3C6D9D]',
+        title: 'Наблюдение',
+        text: 'Я уточняю состояние и выбираю один следующий шаг без расширения плана.'
+      }
+    };
+
+
+    const getChoiceRecommendation = (entry, mode) => {
+      const source = entry?.decision_check?.prove_or_create || '';
+      const tension = Number(entry?.tension || 0);
+      const clarity = Number(entry?.clarity || 0);
+
+      if (mode === 'перегруз' || tension > 7 || clarity < 3) {
+        return {
+          title: 'Сначала минимальный режим',
+          text: 'Я не принимаю стратегических решений. Я снижаю объём и возвращаюсь к телу.',
+          color: 'border-[#B85C5C] bg-[#FDF0F0] text-[#9B3F3F]'
+        };
+      }
+
+      if (source === 'доказать') {
+        return {
+          title: 'Уменьшить объём',
+          text: 'Я не отменяю действие. Я перевожу его в маленькую реальную версию.',
+          color: 'border-[#CC823F] bg-[#FFF6ED] text-[#9A5B20]'
+        };
+      }
+
+      if (source === 'смешано') {
+        return {
+          title: 'Оставить ядро, снять форсаж',
+          text: 'Я оставляю смысл действия и убираю доказывание через срочность.',
+          color: 'border-[#E2B84C] bg-[#FFF8D6] text-[#8C7B3E]'
+        };
+      }
+
+      if (source === 'избегаю') {
+        return {
+          title: 'Шаг на 5 минут',
+          text: 'Я не давлю. Я выбираю один маленький вход в действие.',
+          color: 'border-[#92978B] bg-[#F5F5F2] text-[#62675D]'
+        };
+      }
+
+      if (source === 'создать') {
+        return {
+          title: 'Действие остаётся',
+          text: 'Я делаю одно точное действие и фиксирую результат.',
+          color: 'border-[#548C5F] bg-[#F2F9F3] text-[#2F6B3D]'
+        };
+      }
+
+      return {
+        title: 'Нужно уточнить источник',
+        text: 'Я сначала отвечаю: я доказываю, создаю или избегаю.',
+        color: 'border-[#5B83A6] bg-[#F4F8FB] text-[#3C6D9D]'
+      };
+    };
+
     // --- Базовые шаблоны и предзагруженные дни ---
     const emptyDayTemplate = {
       header: { title: 'ПЛАН ДНЯ', date: '', day: '' },
@@ -359,12 +494,26 @@
         }
       });
 
+      const [dailyEntries, setDailyEntries] = useState(() => {
+        try {
+          const savedEntries = localStorage.getItem('tracker_daily_entries_v1');
+          return savedEntries ? JSON.parse(savedEntries) : {};
+        } catch (e) {
+          return {};
+        }
+      });
+
       // Получаем данные текущего выбранного дня (или генерируем пустой шаблон)
       const dateInfo = getFormattedDateInfo(selectedDateStr);
       const data = daysData[selectedDateStr] || { 
         ...emptyDayTemplate, 
         header: { title: 'ПЛАН ДНЯ', date: dateInfo.date, day: dateInfo.day }
       };
+
+      const dailyEntry = dailyEntries[selectedDateStr] || createEmptyDailyEntry(selectedDateStr);
+      const systemMode = getSystemMode(dailyEntry);
+      const systemModeCard = modeCards[systemMode] || modeCards['наблюдение'];
+      const choiceRecommendation = getChoiceRecommendation(dailyEntry, systemMode);
 
       // Функция для обновления конкретного дня
       const updateCurrentDay = (updater) => {
@@ -419,6 +568,10 @@
       useEffect(() => {
         localStorage.setItem('tracker_days_data_v2', JSON.stringify(daysData));
       }, [daysData]);
+
+      useEffect(() => {
+        localStorage.setItem('tracker_daily_entries_v1', JSON.stringify(dailyEntries));
+      }, [dailyEntries]);
 
       useEffect(() => {
         localStorage.setItem('tracker_history_v2', JSON.stringify(chatHistory));
@@ -551,6 +704,49 @@
         });
       };
 
+      const updateDailyEntry = (updater) => {
+        setDailyEntries(prev => {
+          const current = prev[selectedDateStr] || createEmptyDailyEntry(selectedDateStr);
+          const updated = typeof updater === 'function' ? updater(current) : updater;
+          return { ...prev, [selectedDateStr]: updated };
+        });
+      };
+
+      const handleDailyNumberChange = (field, value) => {
+        updateDailyEntry(entry => ({ ...entry, [field]: Number(value) }));
+      };
+
+      const handleDailyTextChange = (section, field, value) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          [section]: {
+            ...(entry[section] || {}),
+            [field]: value
+          }
+        }));
+      };
+
+      const toggleBodySupport = (field) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          body_support: {
+            ...entry.body_support,
+            [field]: !entry.body_support?.[field]
+          }
+        }));
+      };
+
+
+      const handleDecisionCheckChange = (field, value) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          decision_check: {
+            ...(entry.decision_check || {}),
+            [field]: value
+          }
+        }));
+      };
+
       return (
         <div className="min-h-screen bg-gray-50 pb-12 font-sans text-gray-800">
           
@@ -590,9 +786,10 @@
             </div>
             
             {/* Панель навигации */}
-            <div className="grid grid-cols-4 gap-1 sm:gap-2 mt-4 bg-[#4A6B8A] p-1 rounded-sm w-full max-w-2xl">
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 mt-4 bg-[#4A6B8A] p-1 rounded-sm w-full max-w-3xl">
               {[
                 { id: 'plan', label: 'ДЕНЬ' },
+                { id: 'choice', label: 'ВЫБОР' },
                 { id: 'navigator', label: 'НАВИГАТОР' },
                 { id: 'context', label: 'КОНТЕКСТ' },
                 { id: 'history', label: 'ИСТОРИЯ' }
@@ -615,6 +812,115 @@
             {activeTab === 'plan' && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex flex-col gap-5">
+                  <section className="bg-white border border-gray-200 shadow-sm rounded-sm overflow-hidden">
+                    <div className="bg-[#548C5F] text-white p-3 flex flex-col gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">Сегодня · устойчивость</span>
+                      <h2 className="text-lg font-bold">Тело → состояние → одно действие</h2>
+                    </div>
+
+                    <div className="p-4 flex flex-col gap-5">
+                      <div className={`border-l-4 p-4 rounded-sm ${systemModeCard.color}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wide">Режим системы</span>
+                            <h3 className="text-base font-bold mt-1">{systemModeCard.title}</h3>
+                          </div>
+                          <span className="text-xs font-bold uppercase bg-white/70 px-2 py-1 rounded-sm">{systemMode}</span>
+                        </div>
+                        <p className="text-sm mt-2">{systemModeCard.text}</p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {[
+                          { field: 'sleep_quality', label: 'Сон' },
+                          { field: 'energy', label: 'Энергия' },
+                          { field: 'tension', label: 'Напряжение' },
+                          { field: 'clarity', label: 'Ясность' },
+                          { field: 'anxiety', label: 'Тревожность' },
+                          { field: 'body_contact', label: 'Контакт с телом' }
+                        ].map(item => (
+                          <label key={item.field} className="border border-gray-100 bg-gray-50 p-3 rounded-sm">
+                            <div className="flex justify-between text-xs font-bold uppercase tracking-wide text-gray-500">
+                              <span>{item.label}</span>
+                              <span className="text-[#5B83A6]">{dailyEntry[item.field]}</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="10"
+                              value={dailyEntry[item.field]}
+                              onChange={(e) => handleDailyNumberChange(item.field, e.target.value)}
+                              className="w-full mt-3 accent-[#5B83A6]"
+                            />
+                          </label>
+                        ))}
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wide text-[#548C5F] mb-2">Минимум тела</h3>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                          {[
+                            { field: 'water', label: 'Вода' },
+                            { field: 'protein', label: 'Еда / белок' },
+                            { field: 'warm_food', label: 'Тёплое' },
+                            { field: 'movement_or_air', label: 'Воздух' },
+                            { field: 'pause_or_breathing', label: 'Пауза' }
+                          ].map(item => (
+                            <button
+                              key={item.field}
+                              type="button"
+                              onClick={() => toggleBodySupport(item.field)}
+                              className={`border px-3 py-2 rounded-sm text-sm font-medium transition-colors ${dailyEntry.body_support?.[item.field] ? 'bg-[#E8F5E9] border-[#548C5F] text-[#2F6B3D]' : 'bg-white border-gray-200 text-gray-600 hover:border-[#548C5F]'}`}
+                            >
+                              {dailyEntry.body_support?.[item.field] ? '✓ ' : ''}{item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#CC823F]">Одно главное действие</span>
+                          <textarea
+                            value={dailyEntry.main_contour_action?.title || ''}
+                            onChange={(e) => handleDailyTextChange('main_contour_action', 'title', e.target.value)}
+                            placeholder="Например: собрать один фрагмент приложения"
+                            className="border border-gray-200 rounded-sm p-3 min-h-[88px] text-sm focus:outline-none focus:border-[#CC823F]"
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#92978B]">Восстановление после действия</span>
+                          <textarea
+                            value={dailyEntry.recovery?.planned || ''}
+                            onChange={(e) => handleDailyTextChange('recovery', 'planned', e.target.value)}
+                            placeholder="Например: 10 минут тишины, еда, воздух"
+                            className="border border-gray-200 rounded-sm p-3 min-h-[88px] text-sm focus:outline-none focus:border-[#92978B]"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid md:grid-cols-3 gap-3 border-t border-gray-100 pt-4">
+                        {[
+                          { field: 'what_i_created', label: 'Что я создала' },
+                          { field: 'what_i_held', label: 'Что я удержала' },
+                          { field: 'small_win', label: 'Маленькая победа' }
+                        ].map(item => (
+                          <label key={item.field} className="flex flex-col gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{item.label}</span>
+                            <input
+                              type="text"
+                              value={dailyEntry.result?.[item.field] || ''}
+                              onChange={(e) => handleDailyTextChange('result', item.field, e.target.value)}
+                              className="border border-gray-200 rounded-sm p-2 text-sm focus:outline-none focus:border-[#5B83A6]"
+                              placeholder="Зафиксировать без оценки"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+
                   {Array.isArray(data?.blocks) && data.blocks.map(block => (
                     <div key={block.id} className="bg-white border border-gray-200 shadow-sm rounded-sm overflow-hidden">
                       
@@ -739,7 +1045,91 @@
               </div>
             )}
 
-            {/* --- ЭКРАН 2: НАВИГАТОР --- */}
+
+            {/* --- ЭКРАН 2: ТОЧКА ВЫБОРА --- */}
+            {activeTab === 'choice' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-5">
+                <div className="bg-white border border-[#CC823F] shadow-sm rounded-sm overflow-hidden">
+                  <div className="bg-[#CC823F] text-white p-4">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">Точка выбора</span>
+                    <h2 className="text-xl font-bold mt-1">Я сейчас доказываю или создаю?</h2>
+                    <p className="text-sm mt-2 opacity-90">Этот экран нужен перед постом, продажей, разговором, новым решением или желанием всё поменять.</p>
+                  </div>
+
+                  <div className="p-4 flex flex-col gap-5">
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Какое действие я собираюсь сделать?</span>
+                      <textarea
+                        value={dailyEntry.decision_check?.action_title || ''}
+                        onChange={(e) => handleDecisionCheckChange('action_title', e.target.value)}
+                        placeholder="Например: написать пост, сделать предложение, поменять план"
+                        className="border border-gray-200 rounded-sm p-3 min-h-[88px] text-sm focus:outline-none focus:border-[#CC823F]"
+                      />
+                    </label>
+
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-[#CC823F] mb-2">Источник решения</h3>
+                      <div className="grid sm:grid-cols-5 gap-2">
+                        {['доказать', 'создать', 'смешано', 'избегаю', 'не понимаю'].map(option => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => handleDecisionCheckChange('prove_or_create', option)}
+                            className={`border px-3 py-2 rounded-sm text-sm font-bold transition-colors ${dailyEntry.decision_check?.prove_or_create === option ? 'bg-[#CC823F] border-[#CC823F] text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-[#CC823F]'}`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {[
+                        { field: 'contraction_or_expansion', label: 'Я сейчас', options: ['сжимаюсь', 'раскрываюсь'] },
+                        { field: 'control_or_allow', label: 'Я сейчас', options: ['контролирую', 'допускаю'] },
+                        { field: 'avoid_or_stay', label: 'Я сейчас', options: ['избегаю напряжение', 'остаюсь с ним'] },
+                        { field: 'new_or_reaction', label: 'Моё действие', options: ['привычная реакция', 'новое'] }
+                      ].map(group => (
+                        <div key={group.field} className="border border-gray-100 bg-gray-50 p-3 rounded-sm">
+                          <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">{group.label}</div>
+                          <div className="flex flex-wrap gap-2">
+                            {group.options.map(option => (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => handleDecisionCheckChange(group.field, option)}
+                                className={`border px-3 py-2 rounded-sm text-sm transition-colors ${dailyEntry.decision_check?.[group.field] === option ? 'bg-[#5B83A6] border-[#5B83A6] text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-[#5B83A6]'}`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Короткая заметка</span>
+                      <input
+                        type="text"
+                        value={dailyEntry.decision_check?.note || ''}
+                        onChange={(e) => handleDecisionCheckChange('note', e.target.value)}
+                        placeholder="Что важно не потерять в этом выборе?"
+                        className="border border-gray-200 rounded-sm p-2 text-sm focus:outline-none focus:border-[#5B83A6]"
+                      />
+                    </label>
+
+                    <div className={`border-l-4 p-4 rounded-sm ${choiceRecommendation.color}`}>
+                      <span className="text-[10px] font-bold uppercase tracking-wide">Рекомендация без AI</span>
+                      <h3 className="text-base font-bold mt-1">{choiceRecommendation.title}</h3>
+                      <p className="text-sm mt-2">{choiceRecommendation.text}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- ЭКРАН 3: НАВИГАТОР --- */}
             {activeTab === 'navigator' && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-6">
                 
