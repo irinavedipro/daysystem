@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Трекер Состояния</title>
-  
+
   <!-- Подключение Tailwind CSS для стилей -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
+
   <!-- Подключение React и ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  
+
   <!-- Подключение Babel для компиляции JSX в браузере -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
@@ -45,6 +45,177 @@
       const date = new Date(dateString);
       date.setDate(date.getDate() + daysOffset);
       return date.toISOString().split('T')[0];
+    };
+
+    const getTodayDateString = () => {
+      const date = new Date();
+      const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return offsetDate.toISOString().split('T')[0];
+    };
+
+    const createEmptyDailyEntry = (dateString) => ({
+      date: dateString,
+      sleep_quality: 5,
+      energy: 5,
+      tension: 0,
+      clarity: 5,
+      anxiety: 0,
+      body_contact: 5,
+      body_support: {
+        water: false,
+        protein: false,
+        warm_food: false,
+        movement_or_air: false,
+        pause_or_breathing: false
+      },
+      morning_ascetic: {
+        wake_before_8: false,
+        no_screens_first_hour: false,
+        morning_reflection: ''
+      },
+      daily_practices: {
+        morning_oil: false,
+        water_lemon_honey: false,
+        seed_cocktail: false,
+        walk: false,
+        two_meals: false,
+        exercise: false,
+        tapping: false,
+        reading: false,
+        reflection: false,
+        gratitude: false,
+        analysis: false,
+        mineral_water: false,
+        meditation_or_silence: false
+      },
+      main_contour_action: {
+        title: '',
+        status: 'planned',
+        why_this_action: ''
+      },
+      decision_check: {
+        action_title: '',
+        prove_or_create: '',
+        contraction_or_expansion: '',
+        control_or_allow: '',
+        avoid_or_stay: '',
+        new_or_reaction: '',
+        note: '',
+        final_decision: '',
+        accepted_at: ''
+      },
+      recovery: {
+        planned: '',
+        what_helped: '',
+        minutes: 0
+      },
+      result: {
+        what_i_created: '',
+        what_i_held: '',
+        small_win: '',
+        experience_created: '',
+        tensions_created: '',
+        promises_given: '',
+        promises_done: '',
+        promises_broken: ''
+      },
+      reflection: {
+        raw_text: ''
+      }
+    });
+
+    const getSystemMode = (entry) => {
+      const tension = Number(entry?.tension || 0);
+      const anxiety = Number(entry?.anxiety || 0);
+      const energy = Number(entry?.energy || 0);
+      const clarity = Number(entry?.clarity || 0);
+
+      if (tension >= 8 || anxiety >= 8 || clarity <= 3) return 'перегруз';
+      if (energy <= 3 && clarity <= 4) return 'замирание';
+      if ((tension >= 5 && tension <= 7) || (anxiety >= 5 && anxiety <= 7) || (clarity >= 4 && clarity <= 6)) return 'мобилизация';
+      if (tension <= 4 && anxiety <= 4 && energy >= 5 && clarity >= 6) return 'ресурс';
+      return 'наблюдение';
+    };
+
+    const modeCards = {
+      'ресурс': {
+        color: 'border-[#548C5F] bg-[#F2F9F3] text-[#2F6B3D]',
+        title: 'Ресурс',
+        text: 'Я оставляю одно главное действие и фиксирую результат.'
+      },
+      'мобилизация': {
+        color: 'border-[#CC823F] bg-[#FFF6ED] text-[#9A5B20]',
+        title: 'Мобилизация',
+        text: 'Я сокращаю план, добавляю паузу и не ускоряюсь.'
+      },
+      'перегруз': {
+        color: 'border-[#B85C5C] bg-[#FDF0F0] text-[#9B3F3F]',
+        title: 'Перегруз',
+        text: 'Минимальный день: вода, еда, воздух, 5 минут тишины и одно маленькое действие.'
+      },
+      'замирание': {
+        color: 'border-[#92978B] bg-[#F5F5F2] text-[#62675D]',
+        title: 'Замирание',
+        text: 'Я не строю стратегию. Я возвращаюсь в тело и выбираю шаг на 5 минут.'
+      },
+      'наблюдение': {
+        color: 'border-[#5B83A6] bg-[#F4F8FB] text-[#3C6D9D]',
+        title: 'Наблюдение',
+        text: 'Я уточняю состояние и выбираю один следующий шаг без расширения плана.'
+      }
+    };
+
+
+    const getChoiceRecommendation = (entry, mode) => {
+      const source = entry?.decision_check?.prove_or_create || '';
+      const tension = Number(entry?.tension || 0);
+      const clarity = Number(entry?.clarity || 0);
+
+      if (mode === 'перегруз' || tension > 7 || clarity < 3) {
+        return {
+          title: 'Сначала минимальный режим',
+          text: 'Я не принимаю стратегических решений. Я снижаю объём и возвращаюсь к телу.',
+          color: 'border-[#B85C5C] bg-[#FDF0F0] text-[#9B3F3F]'
+        };
+      }
+
+      if (source === 'доказать') {
+        return {
+          title: 'Уменьшить объём',
+          text: 'Я не отменяю действие. Я перевожу его в маленькую реальную версию.',
+          color: 'border-[#CC823F] bg-[#FFF6ED] text-[#9A5B20]'
+        };
+      }
+
+      if (source === 'смешано') {
+        return {
+          title: 'Оставить ядро, снять форсаж',
+          text: 'Я оставляю смысл действия и убираю доказывание через срочность.',
+          color: 'border-[#E2B84C] bg-[#FFF8D6] text-[#8C7B3E]'
+        };
+      }
+
+      if (source === 'избегаю') {
+        return {
+          title: 'Шаг на 5 минут',
+          text: 'Я не давлю. Я выбираю один маленький вход в действие.',
+          color: 'border-[#92978B] bg-[#F5F5F2] text-[#62675D]'
+        };
+      }
+
+      if (source === 'создать') {
+        return {
+          title: 'Действие остаётся',
+          text: 'Я делаю одно точное действие и фиксирую результат.',
+          color: 'border-[#548C5F] bg-[#F2F9F3] text-[#2F6B3D]'
+        };
+      }
+
+      return {
+        title: 'Нужно уточнить источник',
+        text: 'Я сначала отвечаю: я доказываю, создаю или избегаю.',
+        color: 'border-[#5B83A6] bg-[#F4F8FB] text-[#3C6D9D]'
+      };
     };
 
     // --- Базовые шаблоны и предзагруженные дни ---
@@ -228,13 +399,13 @@
       properties: {
         header: { type: "OBJECT", properties: { title: {type: "STRING"}, date: {type: "STRING"}, day: {type: "STRING"} } },
         aiQuote: { type: "OBJECT", properties: { icon: {type: "STRING"}, text: {type: "STRING"} } },
-        aiResponse: { 
-          type: "OBJECT", 
-          properties: { 
-            changed: {type: "STRING"}, 
-            why: {type: "STRING"}, 
-            recommendation: {type: "STRING"} 
-          } 
+        aiResponse: {
+          type: "OBJECT",
+          properties: {
+            changed: {type: "STRING"},
+            why: {type: "STRING"},
+            recommendation: {type: "STRING"}
+          }
         },
         blocks: {
           type: "ARRAY",
@@ -259,11 +430,11 @@
       }
     };
 
-    const apiKey = ""; 
+    const apiKey = "";
 
     const generateAIPlan = async (userPrompt, currentData, contextData, chatHistory) => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      
+
       const systemInstructionText = `
         Ты — навигатор мышления и системы. Ты работаешь как система, помогающая двигаться из хаоса в устойчивость.
         Твоя задача — собирать день как систему, удерживать фокус, предотвращать перегруз и помогать принимать решения.
@@ -297,7 +468,7 @@
         1. changed (Что я изменил): Четкий список.
         2. why (Почему): Причина с опорой на контекст.
         3. recommendation (На что обратить внимание): Фокус на стабилизацию.
-        
+
         Сохраняй цветовую кодировку. Добавляй уникальные id новым задачам.
       `;
 
@@ -308,7 +479,7 @@
         [ПРАВИЛА СИСТЕМЫ]: ${contextData.rules}
         [ПЛАН НА НЕДЕЛЮ]: ${contextData.week}
       `;
-      
+
       const recentHistory = chatHistory.slice(-5);
       const historyText = recentHistory.map(h => `Запрос: ${h.request} | Ответ: ${h.response?.changed || ''}`).join('\n');
 
@@ -318,9 +489,9 @@
 
         ИСТОРИЯ ИЗМЕНЕНИЙ:
         ${historyText}
-        
-        НОВЫЙ ЗАПРОС: «${userPrompt}». 
-        Текущий план: ${JSON.stringify(currentData)}. 
+
+        НОВЫЙ ЗАПРОС: «${userPrompt}».
+        Текущий план: ${JSON.stringify(currentData)}.
         Пересобери план.
       `;
 
@@ -345,8 +516,8 @@
     };
 
     function App() {
-      const [activeTab, setActiveTab] = useState('plan'); 
-      const [selectedDateStr, setSelectedDateStr] = useState('2026-04-01');
+      const [activeTab, setActiveTab] = useState('plan');
+      const [selectedDateStr, setSelectedDateStr] = useState(getTodayDateString());
 
       // Хранилище всех дней
       const [daysData, setDaysData] = useState(() => {
@@ -359,18 +530,32 @@
         }
       });
 
+      const [dailyEntries, setDailyEntries] = useState(() => {
+        try {
+          const savedEntries = localStorage.getItem('tracker_daily_entries_v1');
+          return savedEntries ? JSON.parse(savedEntries) : {};
+        } catch (e) {
+          return {};
+        }
+      });
+
       // Получаем данные текущего выбранного дня (или генерируем пустой шаблон)
       const dateInfo = getFormattedDateInfo(selectedDateStr);
-      const data = daysData[selectedDateStr] || { 
-        ...emptyDayTemplate, 
+      const data = daysData[selectedDateStr] || {
+        ...emptyDayTemplate,
         header: { title: 'ПЛАН ДНЯ', date: dateInfo.date, day: dateInfo.day }
       };
+
+      const dailyEntry = dailyEntries[selectedDateStr] || createEmptyDailyEntry(selectedDateStr);
+      const systemMode = getSystemMode(dailyEntry);
+      const systemModeCard = modeCards[systemMode] || modeCards['наблюдение'];
+      const choiceRecommendation = getChoiceRecommendation(dailyEntry, systemMode);
 
       // Функция для обновления конкретного дня
       const updateCurrentDay = (updater) => {
         setDaysData(prev => {
-          const current = prev[selectedDateStr] || { 
-            ...emptyDayTemplate, 
+          const current = prev[selectedDateStr] || {
+            ...emptyDayTemplate,
             header: { title: 'ПЛАН ДНЯ', date: dateInfo.date, day: dateInfo.day }
           };
           const updated = typeof updater === 'function' ? updater(current) : updater;
@@ -381,7 +566,8 @@
       const [prompt, setPrompt] = useState('');
       const [isLoading, setIsLoading] = useState(false);
       const [isListening, setIsListening] = useState(false);
-      
+      const [listeningTarget, setListeningTarget] = useState('');
+
       // История
       const [chatHistory, setChatHistory] = useState(() => {
         try {
@@ -421,6 +607,10 @@
       }, [daysData]);
 
       useEffect(() => {
+        localStorage.setItem('tracker_daily_entries_v1', JSON.stringify(dailyEntries));
+      }, [dailyEntries]);
+
+      useEffect(() => {
         localStorage.setItem('tracker_history_v2', JSON.stringify(chatHistory));
       }, [chatHistory]);
 
@@ -428,17 +618,23 @@
         localStorage.setItem('tracker_context_v2', JSON.stringify(contextData));
       }, [contextData]);
 
-      const handleVoiceInput = () => {
+      const handleVoiceInput = (onTranscript, target = 'prompt') => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
           const recognition = new SpeechRecognition();
           recognition.lang = 'ru-RU';
-          recognition.onstart = () => setIsListening(true);
+          recognition.onstart = () => {
+            setListeningTarget(target);
+            setIsListening(true);
+          };
           recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
-            setPrompt(prev => prev ? `${prev} ${transcript}` : transcript);
+            onTranscript(transcript);
           };
-          recognition.onend = () => setIsListening(false);
+          recognition.onend = () => {
+            setIsListening(false);
+            setListeningTarget('');
+          };
           recognition.start();
         } else {
           alert('Функция голосового ввода активируется через микрофон на клавиатуре устройства.');
@@ -451,11 +647,11 @@
         try {
           const currentPrompt = prompt;
           const newData = await generateAIPlan(currentPrompt, data, contextData, chatHistory);
-          
+
           if (newData) {
             updateCurrentDay(newData);
             setPrompt('');
-            
+
             setChatHistory(prev => [
               {
                 id: Date.now(),
@@ -465,7 +661,7 @@
               },
               ...prev
             ]);
-            
+
             setActiveTab('navigator');
           }
         } catch (error) {
@@ -481,7 +677,7 @@
             if (block.id === blockId) {
               return {
                 ...block,
-                tasks: block.tasks?.map(task => 
+                tasks: block.tasks?.map(task =>
                   task.id === taskId ? { ...task, done: !task.done } : task
                 )
               };
@@ -551,9 +747,99 @@
         });
       };
 
+      const updateDailyEntry = (updater) => {
+        setDailyEntries(prev => {
+          const current = prev[selectedDateStr] || createEmptyDailyEntry(selectedDateStr);
+          const updated = typeof updater === 'function' ? updater(current) : updater;
+          return { ...prev, [selectedDateStr]: updated };
+        });
+      };
+
+      const handleDailyNumberChange = (field, value) => {
+        updateDailyEntry(entry => ({ ...entry, [field]: Number(value) }));
+      };
+
+      const handleDailyTextChange = (section, field, value) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          [section]: {
+            ...(entry[section] || {}),
+            [field]: value
+          }
+        }));
+      };
+
+      const toggleBodySupport = (field) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          body_support: {
+            ...entry.body_support,
+            [field]: !entry.body_support?.[field]
+          }
+        }));
+      };
+
+      const toggleDailySectionField = (section, field) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          [section]: {
+            ...(entry[section] || {}),
+            [field]: !entry[section]?.[field]
+          }
+        }));
+      };
+
+
+      const handleDecisionCheckChange = (field, value) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          decision_check: {
+            ...(entry.decision_check || {}),
+            [field]: value
+          }
+        }));
+      };
+
+      const handleReflectionChange = (value) => {
+        updateDailyEntry(entry => ({
+          ...entry,
+          reflection: {
+            ...(entry.reflection || {}),
+            raw_text: value
+          }
+        }));
+      };
+
+      const appendReflectionText = (text) => {
+        updateDailyEntry(entry => {
+          const currentText = entry.reflection?.raw_text || '';
+          return {
+            ...entry,
+            reflection: {
+              ...(entry.reflection || {}),
+              raw_text: currentText ? `${currentText}\n${text}` : text
+            }
+          };
+        });
+      };
+
+      const acceptChoiceDecision = () => {
+        updateDailyEntry(entry => {
+          const action = entry.decision_check?.action_title || entry.main_contour_action?.title || 'одно действие';
+          return {
+            ...entry,
+            decision_check: {
+              ...(entry.decision_check || {}),
+              final_decision: `${choiceRecommendation.title}: ${action}`,
+              accepted_at: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+            }
+          };
+        });
+      };
+
       return (
         <div className="min-h-screen bg-gray-50 pb-12 font-sans text-gray-800">
-          
+
           {/* Шапка */}
           <div className="bg-[#5B83A6] text-white p-4 shadow-md sticky top-0 z-20 flex flex-col items-center justify-center">
             <h1 className="text-lg md:text-xl font-bold tracking-wide uppercase">
@@ -562,25 +848,25 @@
 
             {/* Навигатор по датам */}
             <div className="flex items-center justify-between w-full max-w-sm mt-3 bg-white/10 rounded-sm p-1">
-              <button 
+              <button
                 onClick={() => setSelectedDateStr(shiftDate(selectedDateStr, -1))}
                 className="p-1 hover:bg-white/20 rounded-sm transition-colors text-white"
                 title="Предыдущий день"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
               </button>
-              
+
               <div className="flex flex-col items-center">
                 <span className="text-xs font-bold uppercase tracking-wider">{getFormattedDateInfo(selectedDateStr).day}</span>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   value={selectedDateStr}
                   onChange={(e) => { if(e.target.value) setSelectedDateStr(e.target.value) }}
                   className="bg-transparent text-white text-sm font-medium focus:outline-none text-center cursor-pointer [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
                 />
               </div>
 
-              <button 
+              <button
                 onClick={() => setSelectedDateStr(shiftDate(selectedDateStr, 1))}
                 className="p-1 hover:bg-white/20 rounded-sm transition-colors text-white"
                 title="Следующий день"
@@ -588,16 +874,17 @@
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
               </button>
             </div>
-            
+
             {/* Панель навигации */}
-            <div className="grid grid-cols-4 gap-1 sm:gap-2 mt-4 bg-[#4A6B8A] p-1 rounded-sm w-full max-w-2xl">
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 mt-4 bg-[#4A6B8A] p-1 rounded-sm w-full max-w-3xl">
               {[
                 { id: 'plan', label: 'ДЕНЬ' },
+                { id: 'choice', label: 'ВЫБОР' },
                 { id: 'navigator', label: 'НАВИГАТОР' },
                 { id: 'context', label: 'КОНТЕКСТ' },
                 { id: 'history', label: 'ИСТОРИЯ' }
               ].map(tab => (
-                <button 
+                <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold tracking-wide transition-colors rounded-sm text-center
@@ -615,10 +902,224 @@
             {activeTab === 'plan' && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex flex-col gap-5">
+                  <section className="bg-white border border-gray-200 shadow-sm rounded-sm overflow-hidden">
+                    <div className="bg-[#548C5F] text-white p-3 flex flex-col gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">Сегодня · устойчивость</span>
+                      <h2 className="text-lg font-bold">Тело → состояние → одно действие</h2>
+                    </div>
+
+                    <div className="p-4 flex flex-col gap-5">
+                      <div className={`border-l-4 p-4 rounded-sm ${systemModeCard.color}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wide">Режим системы</span>
+                            <h3 className="text-base font-bold mt-1">{systemModeCard.title}</h3>
+                          </div>
+                          <span className="text-xs font-bold uppercase bg-white/70 px-2 py-1 rounded-sm">{systemMode}</span>
+                        </div>
+                        <p className="text-sm mt-2">{systemModeCard.text}</p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {[
+                          { field: 'sleep_quality', label: 'Сон' },
+                          { field: 'energy', label: 'Энергия' },
+                          { field: 'tension', label: 'Напряжение в теле' },
+                          { field: 'clarity', label: 'Ясность сейчас' },
+                          { field: 'anxiety', label: 'Тревожность' },
+                          { field: 'body_contact', label: 'Контакт с телом' }
+                        ].map(item => (
+                          <label key={item.field} className="border border-gray-100 bg-gray-50 p-3 rounded-sm">
+                            <div className="flex justify-between text-xs font-bold uppercase tracking-wide text-gray-500">
+                              <span>{item.label}</span>
+                              <span className="text-[#5B83A6]">{dailyEntry[item.field]}</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="10"
+                              value={dailyEntry[item.field]}
+                              onChange={(e) => handleDailyNumberChange(item.field, e.target.value)}
+                              className="w-full mt-3 accent-[#5B83A6]"
+                            />
+                            <p className="text-[11px] text-gray-400 mt-1">Фиксация текущего состояния, её можно менять в течение дня.</p>
+                          </label>
+                        ))}
+                      </div>
+
+                      <div className="border border-[#E8D9A8] bg-[#FFFDF2] p-4 rounded-sm flex flex-col gap-3">
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-wide text-[#8C7B3E]">Утренний контур без экрана</h3>
+                          <p className="text-sm text-[#8C7B3E] mt-1">Сначала тело и жизнь, потом телефон. Это не про идеальность, а про выход из зависимости от экрана.</p>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                          {[
+                            { field: 'wake_before_8', label: 'Подъём до 8 по будильнику' },
+                            { field: 'no_screens_first_hour', label: '1 час без экранов' }
+                          ].map(item => (
+                            <button
+                              key={item.field}
+                              type="button"
+                              onClick={() => toggleDailySectionField('morning_ascetic', item.field)}
+                              className={`border px-3 py-2 rounded-sm text-sm font-medium transition-colors ${dailyEntry.morning_ascetic?.[item.field] ? 'bg-[#FFF8D6] border-[#E2B84C] text-[#8C7B3E]' : 'bg-white border-gray-200 text-gray-600 hover:border-[#E2B84C]'}`}
+                            >
+                              {dailyEntry.morning_ascetic?.[item.field] ? '✓ ' : ''}{item.label}
+                            </button>
+                          ))}
+                        </div>
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Утренняя рефлексия</span>
+                          <input
+                            type="text"
+                            value={dailyEntry.morning_ascetic?.morning_reflection || ''}
+                            onChange={(e) => handleDailyTextChange('morning_ascetic', 'morning_reflection', e.target.value)}
+                            placeholder="Что я уже прожила, почувствовала или поняла утром?"
+                            className="border border-gray-200 rounded-sm p-2 text-sm focus:outline-none focus:border-[#E2B84C]"
+                          />
+                        </label>
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wide text-[#548C5F] mb-2">Минимум тела</h3>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                          {[
+                            { field: 'water', label: 'Вода' },
+                            { field: 'protein', label: '2 приёма пищи / белок' },
+                            { field: 'warm_food', label: 'Тёплая еда / напиток' },
+                            { field: 'movement_or_air', label: 'Прогулка / воздух' },
+                            { field: 'pause_or_breathing', label: '5 минут тишины' }
+                          ].map(item => (
+                            <button
+                              key={item.field}
+                              type="button"
+                              onClick={() => toggleBodySupport(item.field)}
+                              className={`border px-3 py-2 rounded-sm text-sm font-medium transition-colors ${dailyEntry.body_support?.[item.field] ? 'bg-[#E8F5E9] border-[#548C5F] text-[#2F6B3D]' : 'bg-white border-gray-200 text-gray-600 hover:border-[#548C5F]'}`}
+                            >
+                              {dailyEntry.body_support?.[item.field] ? '✓ ' : ''}{item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wide text-[#7D6195] mb-2">Привычки и практики дня</h3>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {[
+                            { field: 'morning_oil', label: 'Масло утром натощак' },
+                            { field: 'water_lemon_honey', label: 'Вода + лимон + мёд' },
+                            { field: 'seed_cocktail', label: 'Коктейль из семян' },
+                            { field: 'walk', label: 'Прогулка' },
+                            { field: 'two_meals', label: 'Питание: 2 приёма' },
+                            { field: 'exercise', label: 'Зарядка / физнагрузка' },
+                            { field: 'tapping', label: 'Простукивание' },
+                            { field: 'reading', label: 'Чтение' },
+                            { field: 'reflection', label: 'Рефлексия' },
+                            { field: 'gratitude', label: 'Благодарности' },
+                            { field: 'analysis', label: 'Разбор' },
+                            { field: 'mineral_water', label: 'Минералка' },
+                            { field: 'meditation_or_silence', label: 'Медитация / тишина' }
+                          ].map(item => (
+                            <button
+                              key={item.field}
+                              type="button"
+                              onClick={() => toggleDailySectionField('daily_practices', item.field)}
+                              className={`border px-3 py-2 rounded-sm text-sm font-medium transition-colors text-left ${dailyEntry.daily_practices?.[item.field] ? 'bg-[#F8F5FB] border-[#7D6195] text-[#5F4773]' : 'bg-white border-gray-200 text-gray-600 hover:border-[#7D6195]'}`}
+                            >
+                              {dailyEntry.daily_practices?.[item.field] ? '✓ ' : ''}{item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#CC823F]">Одно главное действие</span>
+                          <textarea
+                            value={dailyEntry.main_contour_action?.title || ''}
+                            onChange={(e) => handleDailyTextChange('main_contour_action', 'title', e.target.value)}
+                            placeholder="Например: собрать один фрагмент приложения"
+                            className="border border-gray-200 rounded-sm p-3 min-h-[88px] text-sm focus:outline-none focus:border-[#CC823F]"
+                          />
+                        </label>
+
+                        <label className="flex flex-col gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wide text-[#92978B]">Восстановление после действия</span>
+                          <textarea
+                            value={dailyEntry.recovery?.planned || ''}
+                            onChange={(e) => handleDailyTextChange('recovery', 'planned', e.target.value)}
+                            placeholder="Например: 10 минут тишины, еда, воздух"
+                            className="border border-gray-200 rounded-sm p-3 min-h-[88px] text-sm focus:outline-none focus:border-[#92978B]"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="border-t border-gray-100 pt-4">
+                        <h3 className="text-xs font-bold uppercase tracking-wide text-[#5B83A6] mb-2">Вечерняя рефлексия</h3>
+                        <p className="text-sm text-gray-500 mb-3">Здесь фиксируется итог дня: опыт, напряжения, обещания и то, что я удержала.</p>
+                        <div className="grid md:grid-cols-3 gap-3">
+                        {[
+                          { field: 'experience_created', label: 'Какой опыт я создала' },
+                          { field: 'tensions_created', label: 'Какие напряжения / реакции я создала' },
+                          { field: 'promises_given', label: 'Какие обещания дала' },
+                          { field: 'promises_done', label: 'Какие выполнила' },
+                          { field: 'promises_broken', label: 'Где нарушила' },
+                          { field: 'what_i_created', label: 'Что я создала' },
+                          { field: 'small_win', label: 'Маленькая победа' },
+                          { field: 'what_i_held', label: 'Что я удержала' }
+                        ].map(item => (
+                          <label key={item.field} className="flex flex-col gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{item.label}</span>
+                            <input
+                              type="text"
+                              value={dailyEntry.result?.[item.field] || ''}
+                              onChange={(e) => handleDailyTextChange('result', item.field, e.target.value)}
+                              className="border border-gray-200 rounded-sm p-2 text-sm focus:outline-none focus:border-[#5B83A6]"
+                              placeholder="Зафиксировать без оценки"
+                            />
+                          </label>
+                        ))}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="bg-white border border-gray-200 shadow-sm rounded-sm overflow-hidden">
+                    <div className="bg-[#5B83A6] text-white p-3 flex flex-col gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">Дневная рефлексия</span>
+                      <h2 className="text-lg font-bold">Писать всё, что происходит в течение дня</h2>
+                    </div>
+                    <div className="p-4 flex flex-col gap-3">
+                      <p className="text-sm text-gray-500">Сюда можно фигачить голосом или текстом: тело, чувства, деньги, действия, реакции, события и выводы. Позже AI будет собирать из этого план и историю.</p>
+                      <textarea
+                        value={dailyEntry.reflection?.raw_text || ''}
+                        onChange={(e) => handleReflectionChange(e.target.value)}
+                        placeholder={"Например: 10.05.2026\nТело: ...\nЧувства: ...\nДействия: ...\nДеньги: ...\nВывод: ..."}
+                        className="border border-gray-200 rounded-sm p-3 min-h-[180px] text-sm focus:outline-none focus:border-[#5B83A6] whitespace-pre-wrap"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => appendReflectionText('Тело:\n•\n\nЧувства:\n•\n\nДействия:\n•\n\nДеньги:\n•\n\nВывод:\n•')}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wide"
+                        >
+                          + Шаблон рефлексии
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleVoiceInput((transcript) => appendReflectionText(transcript), 'reflection')}
+                          disabled={isListening}
+                          className={`px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wide ${isListening && listeningTarget === 'reflection' ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-[#E8F0FE] text-[#3C6D9D] hover:bg-[#DCEAFE]'}`}
+                        >
+                          {isListening && listeningTarget === 'reflection' ? 'Слушаю...' : '🎙️ Диктовать'}
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+
                   {Array.isArray(data?.blocks) && data.blocks.map(block => (
                     <div key={block.id} className="bg-white border border-gray-200 shadow-sm rounded-sm overflow-hidden">
-                      
-                      <div 
+
+                      <div
                         className={`${block.color || 'bg-gray-500'} text-white p-2 px-3 flex justify-between items-center ${block.tasks && block.tasks.length > 0 ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
                         onClick={() => toggleBlockCollapse(block.id)}
                       >
@@ -632,8 +1133,8 @@
                               {renderSafe(block.tag)}
                             </span>
                           )}
-                          <svg 
-                            className={`w-5 h-5 transition-transform duration-200 ${block.isCollapsed ? '' : 'rotate-180'}`} 
+                          <svg
+                            className={`w-5 h-5 transition-transform duration-200 ${block.isCollapsed ? '' : 'rotate-180'}`}
                             fill="none" viewBox="0 0 24 24" stroke="currentColor"
                           >
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -658,11 +1159,11 @@
                             </div>
 
                             {Array.isArray(block.tasks) && block.tasks.map((task) => (
-                              <div 
-                                key={task.id} 
+                              <div
+                                key={task.id}
                                 className={`flex items-stretch border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors group ${task.done ? 'bg-gray-50/50' : ''}`}
                               >
-                                <div 
+                                <div
                                   onClick={() => toggleTask(block.id, task.id)}
                                   className="w-12 md:w-10 flex items-center justify-center py-2 shrink-0 cursor-pointer"
                                 >
@@ -670,9 +1171,9 @@
                                     {task.done && <svg className="w-3 h-3 md:w-2.5 md:h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>}
                                   </div>
                                 </div>
-                                
+
                                 <div className={`flex-1 py-2 pr-3 border-l border-gray-100 pl-3 flex flex-col justify-center ${task.isSub ? 'pl-8' : ''}`}>
-                                  <input 
+                                  <input
                                     type="text"
                                     value={typeof task.title === 'string' ? task.title : (task.title ? String(task.title) : '')}
                                     onChange={(e) => handleTaskEdit(block.id, task.id, e.target.value)}
@@ -698,8 +1199,8 @@
                               </div>
                             ))}
                           </div>
-                        
-                        <button 
+
+                        <button
                           onClick={() => handleTaskAdd(block.id)}
                           className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-500 text-xs font-bold uppercase tracking-wide transition-colors border-t border-gray-100 text-center"
                         >
@@ -720,9 +1221,9 @@
 
                 <div className="mt-8 flex flex-col gap-2">
                   {Array.isArray(data?.footerAlerts) && data.footerAlerts.map((alert, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`p-2 px-3 flex items-start gap-2 text-sm md:text-base font-medium rounded-sm border 
+                    <div
+                      key={idx}
+                      className={`p-2 px-3 flex items-start gap-2 text-sm md:text-base font-medium rounded-sm border
                         ${alert.type === 'danger' ? 'bg-[#FDF0F0] text-[#B85C5C] border-[#F2D6D6]' : 'bg-[#FFF8D6] text-[#8C7B3E] border-[#E8D9A8]'}`}
                     >
                       <span className="shrink-0">{alert.icon || '👉'}</span>
@@ -739,15 +1240,114 @@
               </div>
             )}
 
-            {/* --- ЭКРАН 2: НАВИГАТОР --- */}
+
+            {/* --- ЭКРАН 2: ТОЧКА ВЫБОРА --- */}
+            {activeTab === 'choice' && (
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-5">
+                <div className="bg-white border border-[#CC823F] shadow-sm rounded-sm overflow-hidden">
+                  <div className="bg-[#CC823F] text-white p-4">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">Точка выбора</span>
+                    <h2 className="text-xl font-bold mt-1">Я сейчас доказываю или создаю?</h2>
+                    <p className="text-sm mt-2 opacity-90">Этот экран нужен перед постом, продажей, разговором, новым решением или желанием всё поменять.</p>
+                  </div>
+
+                  <div className="p-4 flex flex-col gap-5">
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Какое действие я собираюсь сделать?</span>
+                      <textarea
+                        value={dailyEntry.decision_check?.action_title || ''}
+                        onChange={(e) => handleDecisionCheckChange('action_title', e.target.value)}
+                        placeholder="Например: написать пост, сделать предложение, поменять план"
+                        className="border border-gray-200 rounded-sm p-3 min-h-[88px] text-sm focus:outline-none focus:border-[#CC823F]"
+                      />
+                    </label>
+
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wide text-[#CC823F] mb-2">Источник решения</h3>
+                      <div className="grid sm:grid-cols-5 gap-2">
+                        {['доказать', 'создать', 'смешано', 'избегаю', 'не понимаю'].map(option => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => handleDecisionCheckChange('prove_or_create', option)}
+                            className={`border px-3 py-2 rounded-sm text-sm font-bold transition-colors ${dailyEntry.decision_check?.prove_or_create === option ? 'bg-[#CC823F] border-[#CC823F] text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-[#CC823F]'}`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {[
+                        { field: 'contraction_or_expansion', label: 'Я сейчас', options: ['сжимаюсь', 'раскрываюсь'] },
+                        { field: 'control_or_allow', label: 'Я сейчас', options: ['контролирую', 'допускаю'] },
+                        { field: 'avoid_or_stay', label: 'Про дискомфорт', options: ['обхожу дискомфорт', 'выдерживаю дискомфорт', 'напряжения нет'] },
+                        { field: 'new_or_reaction', label: 'Моё действие', options: ['привычная реакция', 'новое'] }
+                      ].map(group => (
+                        <div key={group.field} className="border border-gray-100 bg-gray-50 p-3 rounded-sm">
+                          <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">{group.label}</div>
+                          <div className="flex flex-wrap gap-2">
+                            {group.options.map(option => (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => handleDecisionCheckChange(group.field, option)}
+                                className={`border px-3 py-2 rounded-sm text-sm transition-colors ${dailyEntry.decision_check?.[group.field] === option ? 'bg-[#5B83A6] border-[#5B83A6] text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-[#5B83A6]'}`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <label className="flex flex-col gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Короткая заметка</span>
+                      <input
+                        type="text"
+                        value={dailyEntry.decision_check?.note || ''}
+                        onChange={(e) => handleDecisionCheckChange('note', e.target.value)}
+                        placeholder="Что важно не потерять в этом выборе?"
+                        className="border border-gray-200 rounded-sm p-2 text-sm focus:outline-none focus:border-[#5B83A6]"
+                      />
+                    </label>
+
+                    <div className={`border-l-4 p-4 rounded-sm ${choiceRecommendation.color}`}>
+                      <span className="text-[10px] font-bold uppercase tracking-wide">Рекомендация без AI</span>
+                      <h3 className="text-base font-bold mt-1">{choiceRecommendation.title}</h3>
+                      <p className="text-sm mt-2">{choiceRecommendation.text}</p>
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 p-4 rounded-sm flex flex-col gap-3">
+                      <button
+                        type="button"
+                        onClick={acceptChoiceDecision}
+                        className="bg-[#548C5F] text-white px-4 py-3 rounded-sm text-sm font-bold uppercase tracking-wide hover:bg-[#477A51]"
+                      >
+                        Принять и зафиксировать решение
+                      </button>
+                      {dailyEntry.decision_check?.final_decision && (
+                        <p className="text-sm text-gray-700">
+                          <span className="font-bold text-[#548C5F]">Зафиксировано {dailyEntry.decision_check.accepted_at}:</span> {dailyEntry.decision_check.final_decision}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- ЭКРАН 3: НАВИГАТОР --- */}
             {activeTab === 'navigator' && (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex flex-col gap-6">
-                
+
                 <div className="bg-white border border-[#5B83A6] p-4 sm:p-6 rounded-sm shadow-sm flex flex-col gap-4">
                   <label className="text-sm font-bold text-[#5B83A6] uppercase tracking-wide">Дать вводные нейросети:</label>
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1">
-                      <textarea 
+                      <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         placeholder="Надиктуй изменения..."
@@ -761,10 +1361,10 @@
                         disabled={isLoading}
                       />
                       <button
-                        onClick={handleVoiceInput}
+                        onClick={() => handleVoiceInput((transcript) => setPrompt(prev => prev ? `${prev} ${transcript}` : transcript), 'prompt')}
                         disabled={isLoading || isListening}
                         className={`absolute right-3 top-3 p-2 rounded-full transition-colors shadow-sm border ${
-                          isListening ? 'bg-red-100 text-red-600 border-red-200 animate-pulse' : 'bg-white text-gray-500 border-gray-200 hover:text-[#5B83A6] hover:border-[#5B83A6]'
+                          isListening && listeningTarget === 'prompt' ? 'bg-red-100 text-red-600 border-red-200 animate-pulse' : 'bg-white text-gray-500 border-gray-200 hover:text-[#5B83A6] hover:border-[#5B83A6]'
                         }`}
                         title="Диктовать голосом"
                       >
@@ -773,7 +1373,7 @@
                         </svg>
                       </button>
                     </div>
-                    <button 
+                    <button
                       onClick={handleAIUpdate}
                       disabled={isLoading || prompt.trim() === ''}
                       className="bg-[#5B83A6] text-white px-8 py-3 text-sm font-bold rounded-sm hover:bg-[#4A6B8A] transition-colors disabled:opacity-50 whitespace-nowrap h-fit"
@@ -786,7 +1386,7 @@
                 {data?.aiResponse && (
                   <div className="flex flex-col gap-3">
                     <h3 className="font-bold text-gray-500 uppercase tracking-wide text-xs ml-1">🤖 Ответ системы</h3>
-                    
+
                     <div className="bg-white border-l-4 border-[#3C6D9D] p-4 shadow-sm rounded-sm">
                       <span className="text-[10px] font-bold text-[#3C6D9D] uppercase tracking-wide bg-[#E8F0FE] px-2 py-0.5 rounded-sm">Что я изменил</span>
                       <p className="text-gray-800 text-sm md:text-base mt-2 whitespace-pre-line">{renderSafe(data.aiResponse.changed)}</p>
@@ -810,7 +1410,7 @@
                     <p>{renderSafe(data.aiQuote.text)}</p>
                   </div>
                 )}
-                
+
               </div>
             )}
 
@@ -833,7 +1433,7 @@
                     <label className={`font-bold uppercase text-xs tracking-wide ${item.text} ${item.bg} w-fit px-2 py-0.5 rounded-sm`}>
                       {item.label}
                     </label>
-                    <textarea 
+                    <textarea
                       value={contextData[item.id] || ''}
                       onChange={(e) => setContextData(prev => ({ ...prev, [item.id]: e.target.value }))}
                       className="w-full text-sm text-gray-800 min-h-[80px] focus:outline-none resize-y pt-2"
@@ -854,11 +1454,11 @@
 
                 <div className="flex flex-col gap-4 relative">
                   <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200 z-0"></div>
-                  
+
                   {chatHistory.map((item, index) => (
                     <div key={item.id} className="relative z-10 pl-10">
                       <div className="absolute left-[11px] top-4 w-3 h-3 rounded-full bg-[#5B83A6] ring-4 ring-gray-50"></div>
-                      
+
                       <div className="bg-white border border-gray-200 rounded-sm shadow-sm overflow-hidden">
                         <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex justify-between items-center text-xs text-gray-500 font-bold uppercase">
                           <span>Запрос</span>
@@ -867,7 +1467,7 @@
                         <div className="p-4 text-sm text-gray-800 italic">
                           «{renderSafe(item.request)}»
                         </div>
-                        
+
                         {item.response && item.response.changed && (
                           <div className="border-t border-gray-100 p-4 bg-gray-50/50 flex flex-col gap-2">
                             <div className="flex gap-2 items-start text-sm">
